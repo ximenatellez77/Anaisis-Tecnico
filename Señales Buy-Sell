@@ -1,0 +1,83 @@
+pip install yfinance
+
+#numericos difrentes
+import numpy as np
+#lectura de datos y manejo de data sets
+import pandas as pd
+#gráficos
+import matplotlib.pyplot as plt
+#datos
+import pandas_datareader as pdr
+
+
+df= pdr.get_data_fred('DCOILBRENTEU',start='2016-01-01',end='2021-01-01')
+df= df.dropna()
+df.columns=['Close']
+df
+
+#EMA 5 días media movil exponencial, el ewm es para hacerlo exponencial que es practicamente ponderar ya que para el exponencial es mas importante los precios
+#que acaban de pasar y no tanto los anteriores, entc entre mas vijeo sea, mneos peso tiene en el promedio ponderado para la media movil, el span son los dias que quiero de la media exponencial
+df['EMA_short']= df['Close'].ewm(span=5,adjust=False).mean()
+#EMA 20 días
+df['EMA_long']= df['Close'].ewm(span=20,adjust=False).mean()
+df
+# con esto podemos ver que los media movil simple coom necesian todos los precios, los primeros 4 dias para el SMA 5 están en Nan ya quue no tiene los datos suficientes para hacer el  modelo
+#por el otro lado los EMA no necesita tantos datos anteriores, como se fija más en lo reciente por eso es que el primero es identico a su cierre ajustado, y despues empiean los cambios
+
+plt.figure(figsize=(15,8))
+plt.title('DCOIL, EMA-5 Y EMA.20 ')
+plt.plot(df['Close'],color='blue')
+plt.plot(df['EMA_short'],color='orange', alpha=0.4)
+plt.plot(df['EMA_long'],color='red', alpha=0.4)
+plt.xlabel('Fecha')
+plt.ylabel('USD $')
+plt.legend(['Close','EMA_short', 'EMA_long'],loc='lower right')
+plt.show()
+
+#numero de datos
+N=len(df)
+
+#Lista de señales
+#-1 vender
+#0 mantener
+#1 comprar
+signals =[0]
+
+for i in range(1,N):
+    short=df['EMA_short'][i]
+    long=df['EMA_long'][i]
+
+    p_short=df['EMA_short'][i-1]
+    p_long=df['EMA_long'][i-1]
+
+    if p_short < p_long and short>= long:
+      signals.append(1)
+
+    elif p_short > p_long and short <=long:
+      signals.append(-1)
+
+    else:
+      signals.append(0)
+
+df['Signals']=signals
+df
+
+df['Buy']=np.where(df['Signals']==1, df['Close'],np.nan)
+df['Sell']=np.where(df['Signals']==-1, df['Close'],np.nan)
+df
+
+plt.figure(figsize=(16,8))
+plt.plot(df['Close'],alpha=0.4,label='Precios')
+
+plt.scatter(df.index,df['Buy'],color='green',marker='^',label='Compra')
+plt.scatter(df.index,df['Sell'],color='red',marker='v',label='Venta')
+
+plt.title('Señales de compra y venta , EMA 5 Y EMA 20')
+plt.xlabel('Fecha')
+plt.ylabel('Precio USD/barril')
+plt.legend(loc='upper left')
+plt.show()
+
+#Backtesting
+N= len(df)
+N
